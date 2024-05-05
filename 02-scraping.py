@@ -28,8 +28,13 @@ import time
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 # pip install pytest   https://docs.pytest.org/en/latest/
-import pytest
-import re
+# import re
+
+# pip install pymongo   https://www.w3schools.com/PYTHON/python_mongodb_getstarted.asp
+import pymongo 
+from types import NoneType
+
+
 
 
 class ScrapingBrowser:
@@ -69,29 +74,46 @@ class ScrapingBrowser:
 
         # return browser
 
+
     def oliveyoung(self):
         """scraping oliveyoung"""
-        ScrapingBrowser.chrome_webdriver(self)
+        # ScrapingBrowser.chrome_webdriver(self)
         # print(self)
+        
+    async def fetch01_oliveyoung(self):
+        """aiohttp ClientSession"""
+        async with aiohttp.ClientSession() as session:
+            async with session.get(self.url) as resp:
+                # print(resp.status)
+                html = await resp.text()
+                soup = BeautifulSoup(html, "html.parser")
+                area_info = soup.select("a[data-ref-onlbrndcd]")
+                num = 1
+                for info in area_info:
+                    code = info["data-ref-onlbrndcd"]
+                    name = info.text
+                    branddic = {"number":f"{num}","code":f"{code}","brand":f"{name}","staus":True}
+                    num = num + 1
+                    # myclient, mydb 접속
+                    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+                    mydb = myclient["allcodatabase"]   
+                    mycol = mydb["oliveyoungbrandlist"]
+                    # 중복 field 확인 후, update 및 field 없을 경우 추가 insert 
+                    mycol.create_index("number", unique=True)
+                    mycol.update_one({"code":f"{code}"}, {"$set":branddic}, upsert=True)                          
+                    # print(x.inserted_id)
 
-        # async def fetch(session, url):
-        #     async with session.get(url) as response:
-        #         html = await response.text()
-        #         soup = BeautifulSoup(html, "html.parser")
-        #         area_info = soup.find_all("div", "area")
-        #         # print(area_info)
-        #         for info in area_info:
-        #             brand_name = info.find("a")
-        #             if brand_name is not None:
-        #                 print(brand_name.text)
+            await session.close() # 43초 기록
+       
 
-        # async def main():
-        #     async with aiohttp.ClientSession() as session:
-        #         await fetch(session, url)
-        #         return fetch(session, url)
+    def oliveyoungbrandlist(self):
+        """oliveyoung brand list scraping function"""
+        asyncio.run(ScrapingBrowser.fetch01_oliveyoung(self))
 
-        # if __name__ == "__main__":
-        #     asyncio.run(main)
+
+
+
+
 
 
 browser_db = ["https://www.oliveyoung.co.kr"]
@@ -115,47 +137,45 @@ oliveyoung_page_brandlist = f"{browser_db[0]}/store/main/getBrandList.do"
 oliveyoung_page_brandshopdetail = f"{browser_db[0]}/display/getBrandShopDetail.do?onlBrndCd={oliveyoung_brandlist['아벤느']}"
 oliveyoung_page_goodsdetail = f"{browser_db[0]}/store/goods/getGoodsDetail.do?goodsNo={goodslist['아벤느 오 떼르말 300ml 2입 기획']}"
 
-# @pytest.fixture(name="fetch")
 
 
-# async def fetch(session, asdf):
-#     """async/soup test"""
-#     async with session.get(asdf) as response:
-#         html = await response.text()
-#         soup = BeautifulSoup(html, "html.parser")
-#         area_info = soup.find_all("div", "area")
-#         print(area_info)
-#         for info in area_info:
-#             brand_name = info.find("a")
-#             if brand_name is not None:
-#                 print(brand_name.text)
 
-
-async def main():
-    """aiohttp ClientSession"""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(oliveyoung_page_brandlist) as resp:
-            print(resp.status)
-            html = await resp.text()
-            soup = BeautifulSoup(html, "html.parser")
-            area_info = soup.find_all("div", "area")
-            # print(area_info)
-            for info in area_info:
-                if info is not None:
-
-                    # info_a = re.split(info)
-                    print((str(info)))
-        await session.close()
 
 
 if __name__ == "__main__":
-    print(oliveyoung_page_brandlist)
     start = time.time()
-    asyncio.run(main())
+    # asyncio.run(main())
+    ScrapingBrowser.oliveyoungbrandlist(oliveyoung_page_brandlist_arg)
+    # ManagingDatabase()
     end = time.time()
     print(end - start)
-    # ScrapingBrowser.oliveyoung(oliveyoung_page_brandlist)
     # ScrapingBrowser.chrome_webdriver(oliveyoung_page_brandlist)
+
+
+# async def main():
+#     """aiohttp ClientSession"""
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(oliveyoung_page_brandlist) as resp:
+#             print(resp.status)
+#             html = await resp.text()
+#             soup = BeautifulSoup(html, "html.parser")
+#             area_info = soup.select("a[data-ref-onlbrndcd]")
+#             for i in area_info:                      
+#                print(i["data-ref-onlbrndcd"], i.text)
+#         await session.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # oliveYong = "https://www.oliveyoung.co.kr/store/display/getBrandShopDetail.do?onlBrndCd=A000003"
