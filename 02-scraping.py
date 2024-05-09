@@ -83,36 +83,84 @@ class ScrapingBrowser:
             goods_totCnt = driver.find_element(By.ID,"totCnt").text
             totCnt.append(int(goods_totCnt))
             page_calculation = math.ceil(totCnt[0]/48) # total page 구하는 공식
-            print(page_calculation)
+            num_view = 48
+            num_column = [] # 상품 열 수 기록
+            num_row = [] # 상품 행 수 기록
 
-            driver.find_element(By.XPATH,'//*[@id="sub_gbn_cate"]/div[2]/div[2]/ul/li[3]').click()
-            # num = 1
-            # collectiontime = date.today()
+            for page in range(1,page_calculation+1): # 단순 열/행에 대한 for문으로 list에 담아도 될 듯 함. 다시 함수 재정의
+                if page_calculation == 1:
+                    num_columns = math.ceil(totCnt[0]/4)
+                    for column in range(1,num_columns+1):
+                        for row in range(1,5):
+                            num_column.append(column)
+                            num_row.append(row)
+                elif page_calculation > 1:
+                    if page < page_calculation:
+                        num_columns = math.ceil(num_view/4)
+                        for column in range(1,num_columns+1):
+                            for row in range(1,5):
+                                num_column.append(column)
+                                num_row.append(row)
+                    elif page == page_calculation:
+                        num_columns = math.ceil((totCnt[0] - ((page - 1) * num_view))/4)
+                        for column in range(1,num_columns+1):
+                            for row in range(1,5):
+                                num_column.append(column)
+                                num_row.append(row)
+          
+            if totCnt[0] > 24 : # 48개 보기 방식으로의 변경
+                driver.find_element(By.XPATH,'//*[@id="sub_gbn_cate"]/div[2]/div[2]/ul/li[3]').click()
+            
+            for page in range(page_calculation): 
+                                                
 
-            goodsno_elements = driver.find_elements(By.CSS_SELECTOR,"a")
-            price_elements = driver.find_elements(By.CLASS_NAME,"total")
-            for element in goodsno_elements:
-                goodsno = element.get_attribute("data-ref-goodsno")
-                # total_price = price.text
-                # price_elements = driver.find_elements(By.XPATH,'//*[@id="allGoodsList"]/ul[12]/li[3]/div/a')
-                element = []
-                if goodsno == None:
-                    pass
-                elif goodsno != element:
-                    element.append(goodsno) # 동일한 코드 삭제 함수 만들기
-                    # element.update(total_price)
-                # print(total_price)
-                    print(element)
-                #     print(type(element))
+                if totCnt[0] > 49:
 
-            # price_elements = driver.find_elements(By.CLASS_NAME,"total")
-            # for price in price_elements:
-            #     total_price = price.text
-            #     if not total_price: # empty string 제거
-            #         pass
-            #     else:
-            #         print(total_price)
+                    for idx in range(0,48):
+                        elementlist = []
+                        elementlist.append(idx+1)
+                        goodsno = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a').get_attribute("data-ref-goodsno")
+                        elementlist.append(goodsno)
+                        goodsname = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a/span').text
+                        elementlist.append(goodsname)
+                        goodstotal = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[2]/div[2]').text
+                        elementlist.append(goodstotal)
+                        goodssoldout = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/a').text
+                        elementlist.append(goodssoldout)
+                        goodssale = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[3]').text
+                        elementlist.append(goodssale)
+                        print(elementlist)
+                            # print(element_verification)
 
+
+
+                # idx = 0
+                # element_verification = ["default"]
+                # goodsno_elements = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a').get_attribute("data-ref-goodsno")
+
+                # for element in goodsno_elements:
+                # goodsno = element.get_attribute("data-ref-goodsno")
+                # try:
+                #     if goodsno == element_verification[element_verification.index(goodsno)]: 
+                #         pass # 동일한 코드 skip 함수
+                # except ValueError:
+                #     if goodsno == None:
+                #         pass
+                #     elif goodsno == element_verification[0]:
+                #         pass # 동일한 코드 skip 함수
+                #     else:
+                # element_verification.insert(0,goodsno)
+                # idx = idx + 1
+
+
+
+                # element_verification.clear()
+                # try:
+                #     if page_calculation == 2 : 
+                #         driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/div/a').click()
+                # except :
+                #     # else: # driver 종료 함수 정의
+                #     pass
 
 
 
@@ -131,14 +179,6 @@ class ScrapingBrowser:
                 # soldout = element.get_attribute("status_flag soldout")
 
 
-            cc = driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/ul[12]/li[4]/div/a').text
-            dd = driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/ul[12]/li[4]/div/div[1]/a').text
-            ee = driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/ul[12]/li[4]/div/div[1]/div[2]/div[1]').text
-            ff = driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/ul[12]/li[4]/div/div[1]/div[2]/div[2]').text
-            print(cc)
-            print(dd)
-            print(ee)
-            print(ff)
             # for goods in goodslist:
             #     driver.find_element()
 
