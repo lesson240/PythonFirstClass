@@ -29,7 +29,7 @@ import aiodns  # 비동기식 DNS 확인을 수행
 from selenium.webdriver.chrome.service import Service as ChromeService
 
 # pip install pytest   https://docs.pytest.org/en/latest/
-# import re
+import re
 
 # pip install pymongo   https://www.w3schools.com/PYTHON/python_mongodb_getstarted.asp
 import pymongo 
@@ -73,12 +73,12 @@ class ScrapingBrowser:
             driver.maximize_window()
 
             driver.get(self.url)
-            # print(self.url)
-            # driver.implicitly_wait(10)
-            # driver.quit()
 
-            # return driver
-        
+            # myclient, mydb 접속
+            myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+            mydb = myclient["allcodatabase"]   
+            mycol = mydb["oliveyoungbrandshop"]
+
             totCnt = [] # 실제 상품 수
             goods_totCnt = driver.find_element(By.ID,"totCnt").text
             totCnt.append(int(goods_totCnt))
@@ -96,119 +96,63 @@ class ScrapingBrowser:
                             num_row.append(row)
                 elif page_calculation > 1:
                     if page < page_calculation:
+                        totCnt.append(48) # 페이지 내 상품 수 정의
                         num_columns = math.ceil(num_view/4)
                         for column in range(1,num_columns+1):
                             for row in range(1,5):
                                 num_column.append(column)
                                 num_row.append(row)
                     elif page == page_calculation:
+                        pages = totCnt[0] - ((page - 1) * 48)
+                        totCnt.append(pages) # 페이지 내 상품 수 정의
                         num_columns = math.ceil((totCnt[0] - ((page - 1) * num_view))/4)
                         for column in range(1,num_columns+1):
                             for row in range(1,5):
                                 num_column.append(column)
                                 num_row.append(row)
-          
+
             if totCnt[0] > 24 : # 48개 보기 방식으로의 변경
                 driver.find_element(By.XPATH,'//*[@id="sub_gbn_cate"]/div[2]/div[2]/ul/li[3]').click()
             
-            for page in range(page_calculation): 
-                                                
+            num = [1]
+            for page in range(page_calculation):                              
+                for idx in range(0,totCnt[page+1]):
+                    goodsno = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a').get_attribute("data-ref-goodsno").strip()
+                    goodsname = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a/span').text.strip()
+                    goodstotal = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[2]').text
+                    # 최종 판매가(할인가) 추출 함수
+                    sub_condition = re.sub("(원|오늘드림|\n)"," ", goodstotal)
+                    replace_condition = {"," : "_", "." : "_", "(" : "_", ")" : "_", "+" : "_"}
+                    condition_key = "".join(list(replace_condition.keys()))
+                    condition_value = "".join(list(replace_condition.values()))
+                    extract_value = sub_condition.translate(str.maketrans(condition_key,condition_value)).replace("_","").strip().split()
+                    if len(extract_value) == 2:
+                        goodstotal = extract_value[0]
+                    else:
+                        goodstotal = extract_value[1]
+                    goodssoldout = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/a').text
+                    if bool(goodssoldout) == True:
+                        goodssoldout = goodssoldout
+                    elif bool(goodssoldout) == False:
+                        goodssoldout = "판매"
+                    goodssale = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[3]').text
+                    if bool(goodssale) == True:
+                        goodssale = "세일"
+                    elif bool(goodssale) == False:
+                        goodssale = "원가"
+    
+                    mycol.create_index("number", unique=True)   
+                    collectiontime = date.today()
+                    elementlist = {"number":f"{num[0]}","code":f"{goodsno}","name":f"{goodsname}","total_price":f"{goodstotal}","solde_out":f"{goodssoldout}","sale":f"{goodssale}","time":f"{collectiontime}"}
+                    num[0] = num[0] + 1             
+                    mycol.update_one({"code":f"{goodsno}"}, {"$set":elementlist}, upsert=True)                          
 
-                if totCnt[0] > 49:
+                    # async await 함수 적용하기
 
-                    for idx in range(0,48):
-                        elementlist = []
-                        elementlist.append(idx+1)
-                        goodsno = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a').get_attribute("data-ref-goodsno")
-                        elementlist.append(goodsno)
-                        goodsname = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a/span').text
-                        elementlist.append(goodsname)
-                        goodstotal = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[2]/div[2]').text
-                        elementlist.append(goodstotal)
-                        goodssoldout = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/a').text
-                        elementlist.append(goodssoldout)
-                        goodssale = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[3]').text
-                        elementlist.append(goodssale)
-                        print(elementlist)
-                            # print(element_verification)
+                if (page + 1) < page_calculation:
+                    driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/div/a').click()
 
-
-
-                # idx = 0
-                # element_verification = ["default"]
-                # goodsno_elements = driver.find_element(By.XPATH,f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/a').get_attribute("data-ref-goodsno")
-
-                # for element in goodsno_elements:
-                # goodsno = element.get_attribute("data-ref-goodsno")
-                # try:
-                #     if goodsno == element_verification[element_verification.index(goodsno)]: 
-                #         pass # 동일한 코드 skip 함수
-                # except ValueError:
-                #     if goodsno == None:
-                #         pass
-                #     elif goodsno == element_verification[0]:
-                #         pass # 동일한 코드 skip 함수
-                #     else:
-                # element_verification.insert(0,goodsno)
-                # idx = idx + 1
-
-
-
-                # element_verification.clear()
-                # try:
-                #     if page_calculation == 2 : 
-                #         driver.find_element(By.XPATH,'//*[@id="allGoodsList"]/div/a').click()
-                # except :
-                #     # else: # driver 종료 함수 정의
-                #     pass
-
-
-
-            # price_elements = driver.find_elements(By.CSS_SELECTOR,"div")
-            # for element in price_elements:
-            #     price = element.get_property("price")
-                # element = []
-                # if price == None:
-                #     pass
-                # elif price != element:
-                #     element.append(price) # 동일한 코드 삭제 함수 만들기
-                #     print(element)
-
-                    # href = element.get_attribute("href")
-                # src = element.get_attribute("src")
-                # soldout = element.get_attribute("status_flag soldout")
-
-
-            # for goods in goodslist:
-            #     driver.find_element()
-
-                # simple_pdtdic = {"number":f"{num}","code":f"{code}","brand":f"{name}","discount":f"{discount}",\
-                #             "price":f"{price}","soldout":f"{soldout}","time":f"{collectiontime}","staus":True}
-
-
-
-            # if totCnt[0] < 24:
-            #     pass
-
-
-                # 상품 스크래핑 기능
-
-            # elif totCnt[0] > 36:
-                # 1. 자바스크립트를 이용한 방법
-                # element = driver.find_element(By.XPATH,"//*[@id='sub_gbn_cate']/div[2]/div[2]/ul/li[3]")
-                # driver.execute_script("arguments[0].click()",element)
-                # 2. 자바스크립트 문법 & html id 이용
-                # driver.execute_script("document.querySelector('#btnSearch').click()")
-                
-
-                # for page in range(1,page_calculation):
-                    # 상품 스크래핑 기능
-                    
-                    # if page_claculation이 1 초과할 경우, next page로의 click 이동
-
-
-
-            # driver.close()
+            driver.close()
 
 
     def oliveyoung(self):
