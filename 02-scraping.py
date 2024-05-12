@@ -183,7 +183,6 @@ class ScrapingBrowser:
                     elif bool(goodssale) == False:
                         goodssale = "원가"
 
-                    mycol.create_index("number", unique=True)
                     collectiontime = date.today()
                     elementlist = {
                         "number": f"{num[0]}",
@@ -195,6 +194,7 @@ class ScrapingBrowser:
                         "time": f"{collectiontime}",
                     }
                     num[0] = num[0] + 1
+                    mycol.create_index("number", unique=True)
                     mycol.update_one(
                         {"code": f"{goodsno}"}, {"$set": elementlist}, upsert=True
                     )
@@ -228,68 +228,77 @@ class ScrapingBrowser:
             driver.maximize_window()
             driver.get(self.url)
 
-            # myclient, mydb 접속
-            myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-            mydb = myclient["allcodatabase"]
-            mycol = mydb["oliveyounggoodsdetail"]
+            # # myclient, mydb 접속
+            # myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+            # mydb = myclient["allcodatabase"]
+            # mycol = mydb["oliveyounggoodsdetail"]
 
             # 상품명 추출하는 함수
             goodsname = driver.find_element(
                 By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/p[2]'
             ).text.strip()
 
-            # 배송정보 추출하는 함수 만들기
+            # 가격 정보 추출하는 함수  # 가격 정보 최적화 함수 만들기
             btn_sale = driver.find_element(By.ID, "btnSaleOpen")
-            if btn_sale == True:
+            if bool(btn_sale) == True:
                 btn_sale.click()
-                goodssalelist = driver.find_element(By.ID, "saleLayer").text
-            else:
-                pass
-                goodsdelivery = driver.find_element(
-                    By.XPATH,
-                    '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li[1]/div',
-                ).text.strip()
+                goodspricelist = driver.find_element(By.ID, "saleLayer").text
+            elif bool(btn_sale) == False:
+                goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
 
-            # 썸네일(5개) src 추출하는 함수 만들기
-            for thumb in range(1, 5):
-                driver.find_element(
-                    By.ID, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
-                ).click()
-                goodsthumb = driver.find_element(By.ID, "mainImg").get_attribute("src")
+            # 배송 정보 추출하는 함수  # 배송 정보 최적화 함수 만들기
+            goodsdelivery = driver.find_element(By.CLASS_NAME, "bl_list").text
 
-
-            # 상품정보 제공고시 좌표를 생성해 screenshot 자동 함수 만들기
-            btn_buyinfo = driver.find_element(By.ID, "buyInfo")
-            if btn_buyinfo == True:
-                btn_buyinfo.click()
-                screenshot = ImageGrab.grab(bbox=(100, 100, 100, 100))
-            else:
-                pass
-            
             # 일시품절 text 추출하는 함수 만들기
-            goodssoldout = driver.find_element(
-                By.CLASS_NAME, "btnSoldout recoPopBtn temprecobell"
-            ).text
-            if goodssoldout == True:
+            # soldout = driver.find_element(
+            #     By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[7]/button[3]'
+            # )
+            # # if bool(soldout) == True:
+            # #     goodssoldout = soldout.text
+            # #     print(goodssoldout)
+            # # else:
+            # #     goodssoldout = "판매"
+            # print(soldout.text)
+
+            # 썸네일(5개) src 추출하는 함수
+            for thumb in range(1, 5):
+                if bool(thumb) == True:
+                    driver.find_element(
+                        By.XPATH, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
+                    ).click()
+                    goodsthumb = driver.find_element(By.ID, "mainImg").get_attribute(
+                        "src"
+                    )
+                else:
+                    pass
+
+            # 상품정보 제공고시 png 생성 함수
+            btn_buyinfo = driver.find_element(By.ID, "buyInfo")
+            if bool(btn_buyinfo) == True:
+                btn_buyinfo.click()
+                buy_info = driver.find_element(By.ID, "artcInfo")
+                buy_info.screenshot("image.png")
+            else:
                 pass
 
-            mycol.create_index("number", unique=True)
-            collectiontime = date.today()
-            
-            # mongDB 적재용 배열 완료하기 ( + page ulr 포함)
-            elementlist = {
-                # "number": f"{num[0]}",
-                # "code": f"{goodsno}",
-                "name": f"{goodsname}",
-                # "total_price": f"{goodstotal}",
-                "solde_out": f"{goodssoldout}",
-                # "sale": f"{goodssale}",
-                "time": f"{collectiontime}",
-            }
-            # num[0] = num[0] + 1
-            # mycol.update_one(
-            #     {"code": f"{goodsno}"}, {"$set": elementlist}, upsert=True
-            # )
+            # # mongDB 적재용 배열 완료하기 ( + page ulr 포함)
+            # elementlist = {
+            #     # "number": f"{num[0]}",
+            #     # "code": f"{goodsno}",
+            #     "name": f"{goodsname}",
+            #     # "total_price": f"{goodstotal}",
+            #     "solde_out": f"{goodssoldout}",
+            #     # "sale": f"{goodssale}",
+            #     "time": f"{collectiontime}",
+            # }
+
+            # mycol.create_index("number", unique=True)
+            # collectiontime = date.today()
+
+            # # num[0] = num[0] + 1
+            # # mycol.update_one(
+            # #     {"code": f"{goodsno}"}, {"$set": elementlist}, upsert=True
+            # # )
 
             # async await 함수 적용하기
             driver.close()
@@ -339,7 +348,12 @@ class ScrapingBrowser:
 
     def oliveyoungbrandshop(self):
         """Function for scraping the detail page of the oliveryoung brand shop"""
+
         asyncio.run(ScrapingBrowser.fetch02_oliveyoung(self))
+
+    def oliveyounggoodsdetail(self):
+        """Function for scraping the detail page of the oliveryoung goods"""
+        asyncio.run(ScrapingBrowser.fetch03_oliveyoung(self))
 
 
 # front input values
@@ -370,7 +384,8 @@ if __name__ == "__main__":
     start = time.time()
     # asyncio.run(main())
     # ScrapingBrowser.oliveyoungbrandlist(oliveyoung_page_brandlist_arg)
-    ScrapingBrowser.oliveyoungbrandshop(oliveyoung_page_brandshopdetail_arg)
+    # ScrapingBrowser.oliveyoungbrandshop(oliveyoung_page_brandshopdetail_arg)
+    ScrapingBrowser.oliveyounggoodsdetail(oliveyoung_page_goodsdetail_arg)
     # ManagingDatabase()
     end = time.time()
     print(end - start)
