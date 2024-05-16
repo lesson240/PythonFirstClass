@@ -42,9 +42,6 @@ from datetime import date
 import math
 import time
 
-# pip install pillow
-from PIL import ImageGrab
-
 
 class ScrapingBrowser:
     """Brower를 Scraping 해주는 class"""
@@ -166,6 +163,8 @@ class ScrapingBrowser:
                         goodstotal = extract_value[0]
                     else:
                         goodstotal = extract_value[1]
+
+                    # 일시 품절 추출 함수
                     goodssoldout = driver.find_element(
                         By.XPATH,
                         f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/a',
@@ -174,6 +173,8 @@ class ScrapingBrowser:
                         goodssoldout = goodssoldout
                     elif bool(goodssoldout) == False:
                         goodssoldout = "판매"
+
+                    # 세일 정보 추출 함수
                     goodssale = driver.find_element(
                         By.XPATH,
                         f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/div[1]/div[3]',
@@ -243,12 +244,64 @@ class ScrapingBrowser:
             if bool(btn_sale) == True:
                 btn_sale.click()
                 goodspricelist = driver.find_element(By.ID, "saleLayer").text
+                sub_condition = re.sub("(혜택|정보|판매가|원|세일|최적가|레이어|닫기|\n)", " ", goodspricelist)
+                replace_condition = {
+                    ",": "_",
+                    # ".": "_",
+                    "(": "_",
+                    ")": "_",
+                    "~": "_",
+                    "-": "_"
+                }
+                condition_key = "".join(list(replace_condition.keys()))
+                condition_value = "".join(list(replace_condition.values()))
+                extract_value = (
+                    sub_condition.translate(
+                        str.maketrans(condition_key, condition_value)
+                    )
+                    .replace("_", "")
+                    .strip()
+                    .split()
+                )
+
+                if "쿠폰" in extract_value:
+                    coupon = extract_value.index("쿠폰")
+                    del extract_value[coupon]
+                    del extract_value[coupon - 1]
+
+                if len(extract_value) == 5:
+                    goodstotal = extract_value[4]
+                    goodsorign = extract_value[0]
+                    salestart = extract_value[1]
+                    saleend = extract_value[2]
+                    discount = extract_value[3]
+                elif len(extract_value) == 8:
+                    goodstotal = extract_value[7]
+                    goodsorign = extract_value[0]
+                    salestart = extract_value[1]
+                    saleend = extract_value[2]                   
+                    discount = extract_value[3]
+                elif len(extract_value) == 11:
+                    goodstotal = extract_value[10]
+                    goodsorign = extract_value[0]
+                    salestart = extract_value[1]
+                    saleend = extract_value[2]                   
+                    discount = extract_value[3]               
+                else:
+                    goodstotal = extract_value[len(extract_value)-1]
+                    goodsorign = extract_value[0]                    
             elif bool(btn_sale) == False:
                 goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
 
+            print(goodstotal)
+            print(goodsorign)
+            print(salestart)
+            print(saleend)
+            print(discount)
+
             # 배송 정보 추출하는 함수  # 배송 정보 최적화 함수 만들기
             goodsdelivery = driver.find_element(By.CLASS_NAME, "bl_list").text
-
+            
             # 일시품절 text 추출하는 함수 만들기
             # soldout = driver.find_element(
             #     By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[7]/button[3]'
@@ -261,23 +314,22 @@ class ScrapingBrowser:
             # print(soldout.text)
 
             # 썸네일(5개) src 추출하는 함수
-            for thumb in range(1, 5):
-                if bool(thumb) == True:
-                    driver.find_element(
-                        By.XPATH, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
-                    ).click()
-                    goodsthumb = driver.find_element(By.ID, "mainImg").get_attribute(
-                        "src"
-                    )
-                else:
-                    pass
+            thumbcount = len(driver.find_elements(
+                        By.XPATH, f'//*[@id="prd_thumb_list"]/li'))
+            for thumb in range(1,thumbcount+1):
+                driver.find_element(
+                    By.XPATH, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
+                ).click()
+                goodsthumb = driver.find_element(By.ID, "mainImg").get_attribute(
+                    "src"
+                )
 
             # 상품정보 제공고시 png 생성 함수
             btn_buyinfo = driver.find_element(By.ID, "buyInfo")
             if bool(btn_buyinfo) == True:
                 btn_buyinfo.click()
                 buy_info = driver.find_element(By.ID, "artcInfo")
-                buy_info.screenshot("image.png")
+                buy_info.screenshot(f"{goodslist['아벤느 오 떼르말 300ml 2입 기획']}.png")
             else:
                 pass
 
@@ -360,7 +412,7 @@ class ScrapingBrowser:
 
 browser_db = ["https://www.oliveyoung.co.kr"]
 oliveyoung_brandlist = {"아벤느": "A000003"}
-goodslist = {"아벤느 오 떼르말 300ml 2입 기획": "A000000010498"}
+goodslist = {"아벤느 오 떼르말 300ml 2입 기획": "A000000158752"}
 
 oliveyoung_page_brandlist_arg = ScrapingBrowser(
     "올리브영", f"{browser_db[0]}/store/main/getBrandList.do"
