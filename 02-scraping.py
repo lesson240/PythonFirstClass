@@ -239,12 +239,17 @@ class ScrapingBrowser:
                 By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/p[2]'
             ).text.strip()
 
-            # 가격 정보 추출하는 함수  # 가격 정보 최적화 함수 만들기
-            btn_sale = driver.find_element(By.ID, "btnSaleOpen")
-            if bool(btn_sale) == True:
-                btn_sale.click()
+            # 가격 정보 추출하는 함수
+            price_class = driver.find_elements(By.CLASS_NAME,"price")        
+
+            if len(price_class) == 1:
+                goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
+                goodstotal = re.sub("(원|,|\n)", "", goodspricelist)
+
+            else:
+                driver.find_element(By.ID, "btnSaleOpen").click()
                 goodspricelist = driver.find_element(By.ID, "saleLayer").text
-                sub_condition = re.sub("(혜택|정보|판매가|원|세일|최적가|레이어|닫기|\n)", " ", goodspricelist)
+                sub_condition = re.sub("(혜택|정보|판매가|원|최적가|레이어|닫기|\n)", " ", goodspricelist)
                 replace_condition = {
                     ",": "_",
                     # ".": "_",
@@ -268,50 +273,58 @@ class ScrapingBrowser:
                     coupon = extract_value.index("쿠폰")
                     del extract_value[coupon]
                     del extract_value[coupon - 1]
-
-                if len(extract_value) == 5:
-                    goodstotal = extract_value[4]
-                    goodsorign = extract_value[0]
-                    salestart = extract_value[1]
-                    saleend = extract_value[2]
-                    discount = extract_value[3]
-                elif len(extract_value) == 8:
-                    goodstotal = extract_value[7]
-                    goodsorign = extract_value[0]
-                    salestart = extract_value[1]
-                    saleend = extract_value[2]                   
-                    discount = extract_value[3]
-                elif len(extract_value) == 11:
-                    goodstotal = extract_value[10]
-                    goodsorign = extract_value[0]
-                    salestart = extract_value[1]
-                    saleend = extract_value[2]                   
-                    discount = extract_value[3]               
-                else:
-                    goodstotal = extract_value[len(extract_value)-1]
-                    goodsorign = extract_value[0]                    
-            elif bool(btn_sale) == False:
-                goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
-
-            print(goodstotal)
-            print(goodsorign)
-            print(salestart)
-            print(saleend)
-            print(discount)
+                    if "세일" in extract_value:
+                        sale = extract_value.index("세일")
+                        del extract_value[sale]
+                        if len(extract_value) == 8:
+                            goodstotal = extract_value[7]
+                            goodsorign = extract_value[0]
+                            salestart = extract_value[1]
+                            saleend = extract_value[2]
+                            saleprice = extract_value[3]
+                            couponstart = extract_value[4]
+                            couponend = extract_value[5]
+                            couponprice = extract_value[6]
+                        else:
+                            return print("len_extract_value dose not match")
+                    else:
+                        if len(extract_value) == 5:
+                            goodstotal = extract_value[4]
+                            goodsorign = extract_value[0]
+                            couponstart = extract_value[1]
+                            couponend = extract_value[2]
+                            couponprice = extract_value[3]
+                        else:
+                            return print("len_extract_value dose not match")
+                elif "세일" in extract_value:
+                    sale = extract_value.index("세일")
+                    del extract_value[sale]                      
+                    if len(extract_value) == 5:
+                        goodstotal = extract_value[4]
+                        goodsorign = extract_value[0]
+                        salestart = extract_value[1]
+                        saleend = extract_value[2]
+                        saleprice = extract_value[3]
+                    else:
+                        return print("len_extract_value dose not match")
+                # else:
+                #     goodstotal = extract_value[len(extract_value)-1]
+                #     goodsorign = extract_value[0]                    
 
             # 배송 정보 추출하는 함수  # 배송 정보 최적화 함수 만들기
-            goodsdelivery = driver.find_element(By.CLASS_NAME, "bl_list").text
-            
+            delivery_xpath = driver.find_elements(By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li')
+            if delivery_xpath == 1:
+                goodsdelivery = driver.find_element(By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li/div/b[1]').text
+            else:
+                goodsdelivery = driver.find_element(By.XPATH,'//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li[1]/div').text
+
             # 일시품절 text 추출하는 함수 만들기
-            # soldout = driver.find_element(
-            #     By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[7]/button[3]'
-            # )
-            # # if bool(soldout) == True:
-            # #     goodssoldout = soldout.text
-            # #     print(goodssoldout)
-            # # else:
-            # #     goodssoldout = "판매"
-            # print(soldout.text)
+            soldout_css = driver.find_element(By.CSS_SELECTOR, "div.prd_btn_area.new-style.type1").text
+            sub_condition = re.sub("\n", " ", soldout_css).split()
+            if sub_condition[0] == "일시품절":
+                goodssoldout = "일시품절"
+            else:
+                goodssoldout = "판매"
 
             # 썸네일(5개) src 추출하는 함수
             thumbcount = len(driver.find_elements(
@@ -412,7 +425,7 @@ class ScrapingBrowser:
 
 browser_db = ["https://www.oliveyoung.co.kr"]
 oliveyoung_brandlist = {"아벤느": "A000003"}
-goodslist = {"아벤느 오 떼르말 300ml 2입 기획": "A000000158752"}
+goodslist = {"아벤느 오 떼르말 300ml 2입 기획": "A000000188816"}
 
 oliveyoung_page_brandlist_arg = ScrapingBrowser(
     "올리브영", f"{browser_db[0]}/store/main/getBrandList.do"
