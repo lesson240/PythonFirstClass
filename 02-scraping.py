@@ -240,7 +240,9 @@ class ScrapingBrowser:
             ).text.strip()
 
             # 가격 정보 추출하는 함수
-            price_class = driver.find_elements(By.CLASS_NAME,"price")        
+            price_class = driver.find_elements(By.CLASS_NAME, "price")
+            salelist = []
+            couponlist = []
 
             if len(price_class) == 1:
                 goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
@@ -249,14 +251,16 @@ class ScrapingBrowser:
             else:
                 driver.find_element(By.ID, "btnSaleOpen").click()
                 goodspricelist = driver.find_element(By.ID, "saleLayer").text
-                sub_condition = re.sub("(혜택|정보|판매가|원|최적가|레이어|닫기|\n)", " ", goodspricelist)
+                sub_condition = re.sub(
+                    "(혜택|정보|판매가|원|최적가|레이어|닫기|\n)", " ", goodspricelist
+                )
                 replace_condition = {
                     ",": "_",
                     # ".": "_",
                     "(": "_",
                     ")": "_",
                     "~": "_",
-                    "-": "_"
+                    "-": "_",
                 }
                 condition_key = "".join(list(replace_condition.keys()))
                 condition_value = "".join(list(replace_condition.values()))
@@ -279,47 +283,69 @@ class ScrapingBrowser:
                         if len(extract_value) == 8:
                             goodstotal = extract_value[7]
                             goodsorign = extract_value[0]
-                            salestart = extract_value[1]
-                            saleend = extract_value[2]
-                            saleprice = extract_value[3]
-                            couponstart = extract_value[4]
-                            couponend = extract_value[5]
-                            couponprice = extract_value[6]
+                            salelist.extend(
+                                [extract_value[1], extract_value[2], extract_value[3]]
+                            )
+                            # salestart = extract_value[1]
+                            # saleend = extract_value[2]
+                            # saleprice = extract_value[3]
+                            couponlist.extend(
+                                [extract_value[4], extract_value[5], extract_value[6]]
+                            )
+                            # couponstart = extract_value[4]
+                            # couponend = extract_value[5]
+                            # couponprice = extract_value[6]
                         else:
                             return print("len_extract_value dose not match")
                     else:
                         if len(extract_value) == 5:
                             goodstotal = extract_value[4]
                             goodsorign = extract_value[0]
-                            couponstart = extract_value[1]
-                            couponend = extract_value[2]
-                            couponprice = extract_value[3]
+                            couponlist.extend(
+                                [extract_value[1], extract_value[2], extract_value[3]]
+                            )
+                            # couponstart = extract_value[1]
+                            # couponend = extract_value[2]
+                            # couponprice = extract_value[3]
                         else:
                             return print("len_extract_value dose not match")
                 elif "세일" in extract_value:
                     sale = extract_value.index("세일")
-                    del extract_value[sale]                      
+                    del extract_value[sale]
                     if len(extract_value) == 5:
                         goodstotal = extract_value[4]
                         goodsorign = extract_value[0]
-                        salestart = extract_value[1]
-                        saleend = extract_value[2]
-                        saleprice = extract_value[3]
+                        salelist.extend(
+                            [extract_value[1], extract_value[2], extract_value[3]]
+                        )
+                        # salestart = extract_value[1]
+                        # saleend = extract_value[2]
+                        # saleprice = extract_value[3]
                     else:
                         return print("len_extract_value dose not match")
                 # else:
                 #     goodstotal = extract_value[len(extract_value)-1]
-                #     goodsorign = extract_value[0]                    
+                #     goodsorign = extract_value[0]
 
             # 배송 정보 추출하는 함수  # 배송 정보 최적화 함수 만들기
-            delivery_xpath = driver.find_elements(By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li')
+            delivery_xpath = driver.find_elements(
+                By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li'
+            )
             if delivery_xpath == 1:
-                goodsdelivery = driver.find_element(By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li/div/b[1]').text
+                goodsdelivery = driver.find_element(
+                    By.XPATH,
+                    '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li/div/b[1]',
+                ).text
             else:
-                goodsdelivery = driver.find_element(By.XPATH,'//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li[1]/div').text
+                goodsdelivery = driver.find_element(
+                    By.XPATH,
+                    '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li[1]/div',
+                ).text
 
             # 일시품절 text 추출하는 함수 만들기
-            soldout_css = driver.find_element(By.CSS_SELECTOR, "div.prd_btn_area.new-style.type1").text
+            soldout_css = driver.find_element(
+                By.CSS_SELECTOR, "div.prd_btn_area.new-style.type1"
+            ).text
             sub_condition = re.sub("\n", " ", soldout_css).split()
             if sub_condition[0] == "일시품절":
                 goodssoldout = "일시품절"
@@ -327,36 +353,81 @@ class ScrapingBrowser:
                 goodssoldout = "판매"
 
             # 썸네일(5개) src 추출하는 함수
-            thumbcount = len(driver.find_elements(
-                        By.XPATH, f'//*[@id="prd_thumb_list"]/li'))
-            for thumb in range(1,thumbcount+1):
+            thumbcount = len(
+                driver.find_elements(By.XPATH, '//*[@id="prd_thumb_list"]/li')
+            )
+            goodsthumb = []
+            for thumb in range(1, thumbcount + 1):
                 driver.find_element(
                     By.XPATH, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
                 ).click()
-                goodsthumb = driver.find_element(By.ID, "mainImg").get_attribute(
-                    "src"
-                )
+                thumburl = driver.find_element(By.ID, "mainImg").get_attribute("src")
+                goodsthumb.append(thumburl)
 
             # 상품정보 제공고시 png 생성 함수
             btn_buyinfo = driver.find_element(By.ID, "buyInfo")
             if bool(btn_buyinfo) == True:
                 btn_buyinfo.click()
                 buy_info = driver.find_element(By.ID, "artcInfo")
-                buy_info.screenshot(f"{goodslist['아벤느 오 떼르말 300ml 2입 기획']}.png")
+                buy_info.screenshot(
+                    f"{goodslist['아벤느 오 떼르말 300ml 2입 기획']}.png"
+                )
             else:
                 pass
 
-            # # mongDB 적재용 배열 완료하기 ( + page ulr 포함)
-            # elementlist = {
-            #     # "number": f"{num[0]}",
-            #     # "code": f"{goodsno}",
-            #     "name": f"{goodsname}",
-            #     # "total_price": f"{goodstotal}",
-            #     "solde_out": f"{goodssoldout}",
-            #     # "sale": f"{goodssale}",
-            #     "time": f"{collectiontime}",
-            # }
+            collectiontime = date.today()
 
+            # mongDB 적재용 배열 완료하기 ( + page url 포함)
+            elementbase = {
+                # "number": f"{num[0]}",
+                # "code": f"{goodsno}",
+                "name": f"{goodsname}",
+                "total_price": f"{goodstotal}",
+                "delivery": f"{goodsdelivery}",
+                "solde_out": f"{goodssoldout}",
+                "thumb_1": f"{goodsthumb[0]}",
+                "time": f"{collectiontime}",
+            }
+            if len(salelist) == 3 and len(couponlist) == 3:
+                elementadd = {
+                    "origin_price": f"{goodsorign}",
+                    "sale_start": f"{salelist[0]}",
+                    "sale_end": f"{salelist[1]}",
+                    "sale_price": f"{salelist[2]}",
+                }
+            elif len(salelist) == 3:
+                elementadd = {
+                    "origin_price": f"{goodsorign}",
+                    "sale_start": f"{salelist[0]}",
+                    "sale_end": f"{salelist[1]}",
+                    "sale_price": f"{salelist[2]}",
+                }
+            elif len(couponlist) == 3:
+                elementadd = {
+                    "origin_price": f"{goodsorign}",
+                    "coupon_start": f"{couponlist[0]}",
+                    "coupon_end": f"{couponlist[1]}",
+                    "coupon_price": f"{couponlist[2]}",
+                }
+            elementlist = {
+                "origin_price": f"{goodsorign}",
+                "sale_start": f"{salestart}",
+                "sale_end": f"{saleend}",
+                "sale_price": f"{saleprice}",
+                "coupon_start": f"{couponstart}",
+                "coupon_end": f"{couponend}",
+                "coupon_price": f"{couponprice}",
+                "delivery": f"{goodsdelivery}",
+                "solde_out": f"{goodssoldout}",
+                "thumb_1": f"{goodsthumb[0]}",
+                "thumb_2": f"{goodsthumb[1]}",
+                "thumb_3": f"{goodsthumb[2]}",
+                "thumb_4": f"{goodsthumb[3]}",
+                "thumb_5": f"{goodsthumb[4]}",
+                "time": f"{collectiontime}",
+            }
+
+            print(elementlist)
             # mycol.create_index("number", unique=True)
             # collectiontime = date.today()
 
