@@ -46,9 +46,10 @@ import time
 class ScrapingBrowser:
     """Brower를 Scraping 해주는 class"""
 
-    def __init__(self, name, url):
+    def __init__(self, name, url, code):
         self.name = name
         self.url = url
+        self.code = code
 
     async def fetch02_oliveyoung(self):
         """chrome webdriver 함수"""
@@ -164,7 +165,7 @@ class ScrapingBrowser:
                     else:
                         goodstotal = extract_value[1]
 
-                    # 일시 품절 추출 함수
+                    # 일시품절 text 추출 함수
                     goodssoldout = driver.find_element(
                         By.XPATH,
                         f'//*[@id="allGoodsList"]/ul[{num_column[idx]}]/li[{num_row[idx]}]/div/a',
@@ -208,8 +209,8 @@ class ScrapingBrowser:
                     ).click()
 
             driver.close()
-
-    async def fetch03_oliveyoung(self):
+    # mongoDB 적재 시 code 및 time 효율성 재검토 필요
+    async def fetch03_oliveyoung(self): 
         """scraping from a page of oliveyoung goods detail"""
         async with aiohttp.ClientSession() as driver:
             service = webdriver.ChromeService()
@@ -229,24 +230,27 @@ class ScrapingBrowser:
             driver.maximize_window()
             driver.get(self.url)
 
-            # # myclient, mydb 접속
-            # myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-            # mydb = myclient["allcodatabase"]
-            # mycol = mydb["oliveyounggoodsdetail"]
+            # myclient, mydb 접속
+            myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+            mydb = myclient["allcodatabase"]
+            mycol = mydb["oliveyounggoodsdetail"]
+
+            # DB 적재용 'key : value' setting
+            elementlist = { "code": f"{self.code}", "collectiontime": f"{date.today()}"}
 
             # 상품명 추출하는 함수
             goodsname = driver.find_element(
                 By.XPATH, '//*[@id="Contents"]/div[2]/div[2]/div/p[2]'
             ).text.strip()
+            elementlist["name"] = f"{goodsname}"
 
             # 가격 정보 추출하는 함수
             price_class = driver.find_elements(By.CLASS_NAME, "price")
-            salelist = []
-            couponlist = []
 
             if len(price_class) == 1:
                 goodspricelist = driver.find_element(By.CLASS_NAME, "price").text
                 goodstotal = re.sub("(원|,|\n)", "", goodspricelist)
+                elementlist["total_price"] = f"{goodstotal}"
 
             else:
                 driver.find_element(By.ID, "btnSaleOpen").click()
@@ -256,7 +260,7 @@ class ScrapingBrowser:
                 )
                 replace_condition = {
                     ",": "_",
-                    # ".": "_",
+                    ".": "-",
                     "(": "_",
                     ")": "_",
                     "~": "_",
@@ -281,51 +285,36 @@ class ScrapingBrowser:
                         sale = extract_value.index("세일")
                         del extract_value[sale]
                         if len(extract_value) == 8:
-                            goodstotal = extract_value[7]
-                            goodsorign = extract_value[0]
-                            salelist.extend(
-                                [extract_value[1], extract_value[2], extract_value[3]]
-                            )
-                            # salestart = extract_value[1]
-                            # saleend = extract_value[2]
-                            # saleprice = extract_value[3]
-                            couponlist.extend(
-                                [extract_value[4], extract_value[5], extract_value[6]]
-                            )
-                            # couponstart = extract_value[4]
-                            # couponend = extract_value[5]
-                            # couponprice = extract_value[6]
+                            elementlist["total_price"] = f"{extract_value[7]}"
+                            elementlist["goodsorigin"] = f"{extract_value[0]}"
+                            elementlist["salestart"] = f"{extract_value[1]}"
+                            elementlist["saleend"] = f"{extract_value[2]}"
+                            elementlist["saleprice"] = f"{extract_value[3]}"
+                            elementlist["couponstart"] = f"{extract_value[4]}"
+                            elementlist["couponend"] = f"{extract_value[5]}"
+                            elementlist["couponprice"] = f"{extract_value[6]}"
                         else:
                             return print("len_extract_value dose not match")
                     else:
                         if len(extract_value) == 5:
-                            goodstotal = extract_value[4]
-                            goodsorign = extract_value[0]
-                            couponlist.extend(
-                                [extract_value[1], extract_value[2], extract_value[3]]
-                            )
-                            # couponstart = extract_value[1]
-                            # couponend = extract_value[2]
-                            # couponprice = extract_value[3]
+                            elementlist["total_price"] = f"{extract_value[4]}"
+                            elementlist["goodsorigin"] = f"{extract_value[0]}"
+                            elementlist["couponstart"] = f"{extract_value[1]}"
+                            elementlist["couponend"] = f"{extract_value[2]}"
+                            elementlist["couponprice"] = f"{extract_value[3]}"
                         else:
                             return print("len_extract_value dose not match")
                 elif "세일" in extract_value:
                     sale = extract_value.index("세일")
                     del extract_value[sale]
                     if len(extract_value) == 5:
-                        goodstotal = extract_value[4]
-                        goodsorign = extract_value[0]
-                        salelist.extend(
-                            [extract_value[1], extract_value[2], extract_value[3]]
-                        )
-                        # salestart = extract_value[1]
-                        # saleend = extract_value[2]
-                        # saleprice = extract_value[3]
+                        elementlist["total_price"] = f"{extract_value[4]}"
+                        elementlist["goodsorigin"] = f"{extract_value[0]}"
+                        elementlist["salestart"] = f"{extract_value[1]}"
+                        elementlist["saleend"] = f"{extract_value[2]}"
+                        elementlist["saleprice"] = f"{extract_value[3]}"
                     else:
                         return print("len_extract_value dose not match")
-                # else:
-                #     goodstotal = extract_value[len(extract_value)-1]
-                #     goodsorign = extract_value[0]
 
             # 배송 정보 추출하는 함수  # 배송 정보 최적화 함수 만들기
             delivery_xpath = driver.find_elements(
@@ -342,7 +331,9 @@ class ScrapingBrowser:
                     '//*[@id="Contents"]/div[2]/div[2]/div/div[3]/div[1]/ul/li[1]/div',
                 ).text
 
-            # 일시품절 text 추출하는 함수 만들기
+            elementlist["delivery"] = f"{goodsdelivery}"
+
+            # 일시품절 text 추출 함수
             soldout_css = driver.find_element(
                 By.CSS_SELECTOR, "div.prd_btn_area.new-style.type1"
             ).text
@@ -352,17 +343,20 @@ class ScrapingBrowser:
             else:
                 goodssoldout = "판매"
 
-            # 썸네일(5개) src 추출하는 함수
+            elementlist["solde_out"] = f"{goodssoldout}"
+
+            # 썸네일(5개) src 추출 함수
             thumbcount = len(
                 driver.find_elements(By.XPATH, '//*[@id="prd_thumb_list"]/li')
             )
-            goodsthumb = []
+            goodsthumb = {}
             for thumb in range(1, thumbcount + 1):
                 driver.find_element(
                     By.XPATH, f'//*[@id="prd_thumb_list"]/li[{thumb}]'
                 ).click()
                 thumburl = driver.find_element(By.ID, "mainImg").get_attribute("src")
-                goodsthumb.append(thumburl)
+                goodsthumb[f"thumb{thumb}"] = f"{thumburl}"
+            elementlist["thumb"] = goodsthumb
 
             # 상품정보 제공고시 png 생성 함수
             btn_buyinfo = driver.find_element(By.ID, "buyInfo")
@@ -370,71 +364,15 @@ class ScrapingBrowser:
                 btn_buyinfo.click()
                 buy_info = driver.find_element(By.ID, "artcInfo")
                 buy_info.screenshot(
-                    f"{goodslist['아벤느 오 떼르말 300ml 2입 기획']}.png"
+                    f"{self.code}.png"
                 )
             else:
                 pass
 
-            collectiontime = date.today()
-
-            # mongDB 적재용 배열 완료하기 ( + page url 포함)
-            elementbase = {
-                # "number": f"{num[0]}",
-                # "code": f"{goodsno}",
-                "name": f"{goodsname}",
-                "total_price": f"{goodstotal}",
-                "delivery": f"{goodsdelivery}",
-                "solde_out": f"{goodssoldout}",
-                "thumb_1": f"{goodsthumb[0]}",
-                "time": f"{collectiontime}",
-            }
-            if len(salelist) == 3 and len(couponlist) == 3:
-                elementadd = {
-                    "origin_price": f"{goodsorign}",
-                    "sale_start": f"{salelist[0]}",
-                    "sale_end": f"{salelist[1]}",
-                    "sale_price": f"{salelist[2]}",
-                }
-            elif len(salelist) == 3:
-                elementadd = {
-                    "origin_price": f"{goodsorign}",
-                    "sale_start": f"{salelist[0]}",
-                    "sale_end": f"{salelist[1]}",
-                    "sale_price": f"{salelist[2]}",
-                }
-            elif len(couponlist) == 3:
-                elementadd = {
-                    "origin_price": f"{goodsorign}",
-                    "coupon_start": f"{couponlist[0]}",
-                    "coupon_end": f"{couponlist[1]}",
-                    "coupon_price": f"{couponlist[2]}",
-                }
-            elementlist = {
-                "origin_price": f"{goodsorign}",
-                "sale_start": f"{salestart}",
-                "sale_end": f"{saleend}",
-                "sale_price": f"{saleprice}",
-                "coupon_start": f"{couponstart}",
-                "coupon_end": f"{couponend}",
-                "coupon_price": f"{couponprice}",
-                "delivery": f"{goodsdelivery}",
-                "solde_out": f"{goodssoldout}",
-                "thumb_1": f"{goodsthumb[0]}",
-                "thumb_2": f"{goodsthumb[1]}",
-                "thumb_3": f"{goodsthumb[2]}",
-                "thumb_4": f"{goodsthumb[3]}",
-                "thumb_5": f"{goodsthumb[4]}",
-                "time": f"{collectiontime}",
-            }
-
-            print(elementlist)
-            # mycol.create_index("number", unique=True)
-            # collectiontime = date.today()
-
-            # # num[0] = num[0] + 1
-            # # mycol.update_one(
-            # #     {"code": f"{goodsno}"}, {"$set": elementlist}, upsert=True
-            # # )
+            # mongoDB로의 update 함수
+            mycol.update_one(
+                {"code": f"{self.code}"}, {"$set": elementlist}, upsert=True
+            )
 
             # async await 함수 적용하기
             driver.close()
@@ -494,26 +432,26 @@ class ScrapingBrowser:
 
 # front input values
 
-browser_db = ["https://www.oliveyoung.co.kr"]
+browser_db = {"올리브영": "https://www.oliveyoung.co.kr", "marketcode": "O001"}
 oliveyoung_brandlist = {"아벤느": "A000003"}
 goodslist = {"아벤느 오 떼르말 300ml 2입 기획": "A000000188816"}
 
 oliveyoung_page_brandlist_arg = ScrapingBrowser(
-    "올리브영", f"{browser_db[0]}/store/main/getBrandList.do"
+    "올리브영", f"{browser_db['올리브영']}/store/main/getBrandList.do", f"{browser_db['marketcode']}"
 )
 
 oliveyoung_page_brandshopdetail_arg = ScrapingBrowser(
-    "올리브영",
-    f"{browser_db[0]}/store/display/getBrandShopDetail.do?onlBrndCd={oliveyoung_brandlist['아벤느']}",
+    "아벤느",
+    f"{browser_db['올리브영']}/store/display/getBrandShopDetail.do?onlBrndCd={oliveyoung_brandlist['아벤느']}", f"{oliveyoung_brandlist['아벤느']}"
 )
 oliveyoung_page_goodsdetail_arg = ScrapingBrowser(
-    "올리브영",
-    f"{browser_db[0]}/store/goods/getGoodsDetail.do?goodsNo={goodslist['아벤느 오 떼르말 300ml 2입 기획']}",
+    "아벤느",
+    f"{browser_db['올리브영']}/store/goods/getGoodsDetail.do?goodsNo={goodslist['아벤느 오 떼르말 300ml 2입 기획']}", f"{goodslist['아벤느 오 떼르말 300ml 2입 기획']}"
 )
 
-oliveyoung_page_brandlist = f"{browser_db[0]}/store/main/getBrandList.do"
-oliveyoung_page_brandshopdetail = f"{browser_db[0]}/display/getBrandShopDetail.do?onlBrndCd={oliveyoung_brandlist['아벤느']}"
-oliveyoung_page_goodsdetail = f"{browser_db[0]}/store/goods/getGoodsDetail.do?goodsNo={goodslist['아벤느 오 떼르말 300ml 2입 기획']}"
+oliveyoung_page_brandlist = f"{browser_db['올리브영']}/store/main/getBrandList.do"
+oliveyoung_page_brandshopdetail = f"{browser_db['올리브영']}/display/getBrandShopDetail.do?onlBrndCd={oliveyoung_brandlist['아벤느']}"
+oliveyoung_page_goodsdetail = f"{browser_db['올리브영']}/store/goods/getGoodsDetail.do?goodsNo={goodslist['아벤느 오 떼르말 300ml 2입 기획']}"
 
 
 if __name__ == "__main__":
