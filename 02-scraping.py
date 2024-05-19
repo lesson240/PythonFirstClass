@@ -386,35 +386,35 @@ class ScrapingBrowser:
         """aiohttp ClientSession"""
         async with aiohttp.ClientSession() as session:
             async with session.get(self.url) as resp:
-                # print(resp.status)
                 html = await resp.text()
                 soup = BeautifulSoup(html, "html.parser")
                 area_info = soup.select("a[data-ref-onlbrndcd]")
-                num = 1
+                branddics = []
                 for info in area_info:
                     code = info["data-ref-onlbrndcd"]
                     name = info.text
                     collectiontime = date.today()
-                    branddic = {
-                        "number": f"{num}",
-                        "code": f"{code}",
-                        "brand": f"{name}",
-                        "time": f"{collectiontime}",
-                        "staus": True,
-                    }
-                    num = num + 1
-                    # myclient, mydb 접속
-                    myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-                    mydb = myclient["allcodatabase"]
-                    mycol = mydb["oliveyoungbrandlist"]
-                    # 중복 field 확인 후, update 및 field 없을 경우 추가 insert
-                    mycol.create_index("number", unique=True)
-                    mycol.update_one(
-                        {"code": f"{code}"}, {"$set": branddic}, upsert=True
-                    )
-                    # print(x.inserted_id)
+                    item = [ i ["code"] for i in branddics]
 
-            await session.close()  # 43초 기록 # logging module 필요
+                    if code in item:
+                        pass
+                    else:
+                        branddic = {
+                            "code": f"{code}",
+                            "brand": f"{name}",
+                            "time": f"{collectiontime}",
+                            "status": "Old",
+                        }
+                        branddics.append(branddic)
+
+                # myclient, mydb 접속
+                myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+                mydb = myclient["allcodatabase"]
+                mycol = mydb["oliveyoungbrandlist"] 
+                mycol.delete_many({})
+                mycol.insert_many(branddics)
+
+            await session.close()  # 43초 기록 > 4.8초로 단축 (mongoDB 통신 횟수를 줄임) # logging module 필요
 
     def oliveyoungbrandlist(self):
         """Function for scraping the brand list of the oliveyoung"""
@@ -457,9 +457,9 @@ oliveyoung_page_goodsdetail = f"{browser_db['올리브영']}/store/goods/getGood
 if __name__ == "__main__":
     start = time.time()
     # asyncio.run(main())
-    # ScrapingBrowser.oliveyoungbrandlist(oliveyoung_page_brandlist_arg)
+    ScrapingBrowser.oliveyoungbrandlist(oliveyoung_page_brandlist_arg)
     # ScrapingBrowser.oliveyoungbrandshop(oliveyoung_page_brandshopdetail_arg)
-    ScrapingBrowser.oliveyounggoodsdetail(oliveyoung_page_goodsdetail_arg)
+    # ScrapingBrowser.oliveyounggoodsdetail(oliveyoung_page_goodsdetail_arg)
     # ManagingDatabase()
     end = time.time()
     print(end - start)
