@@ -9,52 +9,49 @@ import asyncio
 import pymongo
 
 
-async def fetch01_oliveyoung(url):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            soup = BeautifulSoup(await resp.text(), "html.parser")
-            area_info = soup.select("a[data-ref-onlbrndcd]")
-            branddics = []
-            for info in area_info:
-                code = info["data-ref-onlbrndcd"]
-                name = info.text
-                collectiontime = date.today()
-                item = [ i ["code"] for i in branddics]
 
-                if code in item:
-                    pass
-                else:
-                    branddic = {
-                        "code": f"{code}",
-                        "brand": f"{name}",
-                        "time": f"{collectiontime}",
-                        "status": "Old",
-                    }
-                    branddics.append(branddic)
-            print(branddics)
-            # myclient, mydb 접속
-            myclient = pymongo.MongoClient("mongodb://localhost:27017/")
-            mydb = myclient["allcodatabase"]
-            mycol = mydb["oliveyoungbrandlist"] 
-            mycol.insert_many(branddics)
+# async def fetch01_oliveyoung(url):
+#     async with aiohttp.ClientSession() as session:
+#         async with session.get(url) as resp:
+#             soup = BeautifulSoup(await resp.text(), "html.parser")
+#             area_info = soup.select("a[data-ref-onlbrndcd]")
+#             branddics = []
+#             for info in area_info:
+#                 code = info["data-ref-onlbrndcd"]
+#                 name = info.text
+#                 collectiontime = date.today()
+#                 item = [ i ["code"] for i in branddics]
 
-        await session.close()  # 43초 기록 # logging module 필요
+#                 if code in item:
+#                     pass
+#                 else:
+#                     branddic = {
+#                         "code": f"{code}",
+#                         "brand": f"{name}",
+#                         "time": f"{collectiontime}",
+#                         "status": "Old",
+#                     }
+#                     branddics.append(branddic)
+#             print(branddics)
+#             # myclient, mydb 접속
+#             myclient = pymongo.MongoClient("mongodb://localhost:27017/")
+#             mydb = myclient["allcodatabase"]
+#             mycol = mydb["oliveyoungbrandlist"] 
+#             mycol.insert_many(branddics)
+
+#         await session.close()  # 43초 기록 # logging module 필요
 
 
-def oliveyoungbrandlist():
-    url = "https://www.oliveyoung.co.kr/store/main/getBrandList.do"
-    """Function for scraping the brand list of the oliveyoung"""
-    asyncio.run(fetch01_oliveyoung(url))
+# def oliveyoungbrandlist():
+#     url = "https://www.oliveyoung.co.kr/store/main/getBrandList.do"
+#     """Function for scraping the brand list of the oliveyoung"""
+#     asyncio.run(fetch01_oliveyoung(url))
 
-if __name__ == "__main__":
-    start = time.time()
-    # asyncio.run(main())
-    oliveyoungbrandlist()
-    # ScrapingBrowser.oliveyoungbrandshop(oliveyoung_page_brandshopdetail_arg)
-    # ScrapingBrowser.oliveyounggoodsdetail(oliveyoung_page_goodsdetail_arg)
-    # ManagingDatabase()
-    end = time.time()
-    print(end - start)
+# if __name__ == "__main__":
+#     start = time.time()
+#     oliveyoungbrandlist()
+#     end = time.time()
+#     print(end - start)
 
 # aa = "17,000원\n14,900원 오늘드림\n4.5(49)"
 # aa = "33,000원 오늘드림\n4.8(999+)"
